@@ -5,7 +5,7 @@ PIP = $(VENV)/bin/pip
 .PHONY: run clean
 
 run: $(VENV)/bin/activate
-	$(PYTHON) src/main.py
+	$(PYTHON) src/website1.py
 
 gen_link:
 	$(PYTHON) src/gen_link.py
@@ -18,6 +18,9 @@ lesson_dl:
 
 scrape:
 	$(PYTHON) src/scrape.py
+
+run_web2:
+	$(PYTHON) src/website2.py
 
 $(VENV)/bin/activate: requirements.txt
 	python3 -m venv $(VENV)

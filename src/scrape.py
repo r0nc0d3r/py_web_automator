@@ -1,7 +1,6 @@
 import requests
 from bs4 import BeautifulSoup
-
-DOMAIN = "DOMAIN"
+from vars.website1 import *
 
 URL = f"https://{DOMAIN}"
 

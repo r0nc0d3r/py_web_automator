@@ -5,10 +5,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 import time
-
-TECH = "javascript"
-
-DOMAIN = "DOMAIN"
+from vars.website1 import *
 
 URL = f"https://{DOMAIN}"
 
@@ -37,10 +34,9 @@ for cookie in cookies:
         pass
 
 file_path = f"{TECH}_mdl_list.txt"
-vids_xpath = '//*[@id="__next"]/div[3]/div/div/div/div[2]/section/div[3]/ul/li/div/div[2]/div[1]/a'
-auth_welcome_xpath = '//*[@id="__next"]/div[3]/nav/div/div[2]/a[2]/img'
-dl_btn_xpath = '//*[@id="__next"]/div[3]/div/div[1]/div/div[1]/div/div/div[2]/div[3]/div[3]/button[1]'
+
 dl_btn_id = "#__next > div.flex.flex-col.min-h-screen > div > div:nth-child(1) > div > div.relative.before\:float-left.after\:clear-both.after\:table.col-span-9 > div > div > div.cueplayer-react-controls-holder > div.cueplayer-react-control-bar > div.cueplayer-react-control-bar-right-part > button.flex.items-center.justify-center.w-10.h-10.text-white.border-none"
+
 with open(file_path, "r") as file:
     for line in file:
         url = line.strip()

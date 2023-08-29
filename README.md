@@ -1,5 +1,11 @@
 # README
 
+Install dependencies
+
+```bash
+make venv/bin/activate
+```
+
 Generate login link
 
 ```bash
@@ -22,6 +28,10 @@ Manual download lessons
 
 ```bash
 make lesson_dl
+```
+
+```bash
+make run_web2
 ```
 
 ---

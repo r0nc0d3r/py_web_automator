@@ -5,14 +5,11 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.action_chains import ActionChains
 import time
-
-TECH = "angular"
-
-DOMAIN = "DOMAIN"
+from vars.website1 import *
 
 URL = f"https://{DOMAIN}"
 
-PAGE = 2
+PAGE = 1
 
 options = webdriver.ChromeOptions()
 
@@ -39,8 +36,6 @@ for cookie in cookies:
         pass
 
 driver.get(f"{URL}/q/{TECH}?access_state=pro&type=playlist&page={PAGE}")
-
-auth_welcome_xpath = '//*[@id="__next"]/div[3]/nav/div/div[2]/a[2]/img'
 
 wait.until(EC.presence_of_element_located((By.XPATH, auth_welcome_xpath)))
 

@@ -1,5 +1,6 @@
 beautifulsoup4
 black
 lxml
+pandas
 requests
 selenium
