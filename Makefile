@@ -22,6 +22,9 @@ scrape:
 run_web2:
 	$(PYTHON) src/website2.py
 
+run_web3:
+	$(PYTHON) src/website3.py
+
 $(VENV)/bin/activate: requirements.txt
 	python3 -m venv $(VENV)
 	$(PYTHON) -m pip install --upgrade pip
