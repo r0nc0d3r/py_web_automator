@@ -5,16 +5,20 @@ from selenium import webdriver
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.common.by import By
+
 # from selenium.webdriver.common.action_chains import ActionChains
 from vars.website3 import *
 import time
 import traceback
+
 # import pandas as pd
 # from datetime import datetime
 import os
 import logging
 from common.logger import *
 import json
+from PIL import Image
+from io import BytesIO
 
 LOG_LEVEL = logging.INFO
 
@@ -114,9 +118,15 @@ def get_week_title_and_path(driver, wait, week_num):
 
     wait.until(EC.visibility_of_element_located((By.XPATH, AUTH_MSG_XPATH)))
 
-    wait.until(EC.visibility_of_element_located((By.XPATH, LECTURE_LINK_XPATH)))
+    # logger.info("auth message located")
+
+    wait.until(EC.presence_of_element_located((By.XPATH, LECTURE_LINK_XPATH)))
+
+    # logger.info("lecture link located")
 
     wait.until(EC.visibility_of_element_located((By.XPATH, WEEK_TITLE_XPATH)))
+
+    # logger.info("week title located")
 
     week_title_elm = driver.find_elements(By.XPATH, WEEK_TITLE_XPATH)[1]
     week_title = week_title_elm.text
@@ -211,6 +221,10 @@ def course_dl(driver, wait, week_num):
 def download_lectures(driver, wait, week_num):
     logger.info("Downloading lectures...")
     week_dump_list_file_path = get_week_title_and_path(driver, wait, week_num)
+    # if path exists
+    if os.path.exists(week_dump_list_file_path):
+        logger.info(f"Module {week_dump_list_file_path} already downloaded")
+        return
     with open(f"{week_dump_list_file_path}.json", "r") as file:
         dl_links = json.load(file)
     file_index = 0
@@ -260,6 +274,83 @@ def set_autoplay_off(driver, wait):
     logger.info("Local storage set")
 
 
+def downloadQuiz(driver, wait):
+    quiz_file_path = "exports/quiz.md"
+    if os.path.exists(quiz_file_path):
+        logger.info(f"Quiz already downloaded")
+        return
+    logger.info("Downloading quiz...")
+    quiz_url = f"{URL}{QUIZ_ENDPOINT}"
+    driver.get(quiz_url)
+    wait.until(EC.visibility_of_element_located((By.XPATH, FEEDBACK_QUESTIONS_XPATH)))
+
+    questions = driver.find_elements(By.XPATH, FEEDBACK_QUESTIONS_XPATH)
+    questions_text = ""
+    for i, question in enumerate(questions):
+        driver.execute_script("arguments[0].scrollIntoView();", question)
+        question_text = question.text
+        questions_text += ("" if i == 0 else "\n") + question_text
+
+    logger.debug(f"Quiz text: {questions_text}")
+
+    with open(quiz_file_path, "w") as file:
+        file.write(questions_text)
+
+    logger.info("Downloaded quiz...")
+
+
+def downloadQuizImages(driver, wait):
+    screenshot_path = "exports/quiz.png"
+    if os.path.exists(screenshot_path):
+        logger.info(f"Quiz already downloaded")
+        return
+    logger.info("Downloading quiz...")
+    quiz_url = f"{URL}{QUIZ_ENDPOINT}"
+    driver.get(quiz_url)
+    wait.until(EC.visibility_of_element_located((By.XPATH, FEEDBACK_QUESTIONS_XPATH)))
+
+    questions = driver.find_elements(By.XPATH, FEEDBACK_QUESTIONS_XPATH)
+
+    # Initialize a list to store the screenshots
+    screenshots = []
+    old_height = 0
+    # Capture screenshots of each div element
+    for div_element in questions:
+        driver.execute_script("arguments[0].scrollIntoView();", div_element)
+        # Get the position and size of the div element
+        location = div_element.location
+        size = div_element.size
+
+        # Take a screenshot of the entire page
+        screenshot = driver.get_screenshot_as_png()
+
+        # Convert the screenshot to an Image object
+        screenshot = Image.open(BytesIO(screenshot))
+
+        # Crop the screenshot to include only the div element
+        height = size["height"]
+        left = location["x"]
+        top = location["y"]
+        right = location["x"] + size["width"]
+        bottom = location["y"] + height
+        cropped_screenshot = screenshot.crop(
+            (left, top - old_height, right, bottom - old_height)
+        )
+        # old_height = height
+        # Append the cropped screenshot to the list
+        screenshots.append(cropped_screenshot)
+
+    # Save or process the screenshots as needed
+    for i, screenshot in enumerate(screenshots):
+        ss_file_path = f"exports/screens/quiz_{i+1}.png"
+        # if ss_file_path exists
+        if os.path.exists(ss_file_path):
+            continue
+        screenshot.save(ss_file_path)
+
+    logger.info("Downloaded quiz")
+
+
 def main():
     options = webdriver.ChromeOptions()
 
@@ -285,6 +376,15 @@ def main():
             + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
         )
     try:
+        downloadQuiz(_driver, _wait)
+        _driver.quit()
+        return
+    except Exception:
+        logger.error(
+            "Error downloading quiz"
+            + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
+        )
+    try:
         WEEK_COUNT = get_week_count(_driver, _wait)
         set_autoplay_off(_driver, _wait)
         logger.info("Week count: " + str(WEEK_COUNT))
@@ -298,7 +398,7 @@ def main():
                     "Error downloading course"
                     + (
                         ": " + traceback.format_exc()
-                        if LOG_LEVEL == logging.INFO
+                        if LOG_LEVEL == logging.DEBUG
                         else ""
                     )
                 )
@@ -307,6 +407,8 @@ def main():
             "Error getting week"
             + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
         )
+
+    _driver.quit()
 
 
 if __name__ == "__main__":
