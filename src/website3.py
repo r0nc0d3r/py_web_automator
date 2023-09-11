@@ -274,13 +274,13 @@ def set_autoplay_off(driver, wait):
     logger.info("Local storage set")
 
 
-def downloadQuiz(driver, wait):
+def downloadQuiz(driver, wait, endpoint):
     quiz_file_path = "exports/quiz.md"
     if os.path.exists(quiz_file_path):
         logger.info(f"Quiz already downloaded")
         return
     logger.info("Downloading quiz...")
-    quiz_url = f"{URL}{QUIZ_ENDPOINT}"
+    quiz_url = f"{URL}{endpoint}"
     driver.get(quiz_url)
     wait.until(EC.visibility_of_element_located((By.XPATH, FEEDBACK_QUESTIONS_XPATH)))
 
@@ -376,14 +376,17 @@ def main():
             + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
         )
     try:
-        downloadQuiz(_driver, _wait)
+        # downloadQuiz(_driver, _wait, QUIZ_ENDPOINT) # for quiz
+        downloadQuiz(_driver, _wait, EXAM_ENDPOINT) # for exam
         _driver.quit()
         return
     except Exception:
         logger.error(
             "Error downloading quiz"
-            + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
+            + (": " + traceback.format_exc() if LOG_LEVEL == logging.INFO else "")
         )
+        _driver.quit()
+        return
     try:
         WEEK_COUNT = get_week_count(_driver, _wait)
         set_autoplay_off(_driver, _wait)
