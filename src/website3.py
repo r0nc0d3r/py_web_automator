@@ -383,7 +383,7 @@ def main():
     except Exception:
         logger.error(
             "Error downloading quiz"
-            + (": " + traceback.format_exc() if LOG_LEVEL == logging.INFO else "")
+            + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
         )
         _driver.quit()
         return
