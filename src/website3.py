@@ -132,8 +132,52 @@ def get_week_title_and_path(driver, wait, week_num):
     week_title = week_title_elm.text
     week_title = week_title.replace("/", "-")
     week_title = week_title.replace(":", " -")
-    week_dump_list_file_path = f"exports/lectures/{week_num}. {week_title}"
+    week_dump_list_file_path = (
+        f"exports/courses/{COURSE_TITLE}/{week_num}. {week_title}"
+    )
     return week_dump_list_file_path
+
+
+def dump_week_intro(driver, wait, week_dump_list_file_path, week_num):
+    supplement_dump_path = f"{week_dump_list_file_path}/Supplements"
+    if not os.path.exists(supplement_dump_path):
+        os.makedirs(supplement_dump_path)
+    week_intro_dump_path = f"{supplement_dump_path}/0. Intro.md"
+    if not os.path.exists(f"{week_intro_dump_path}"):
+        intro_section = driver.find_element(By.CSS_SELECTOR, WEEK_INTRO_SELECTOR)
+        intro_section.find_element(By.XPATH, WEEK_INTRO_BUTTON_XPATH).click()
+        wait.until(
+            EC.visibility_of_element_located((By.XPATH, WEEK_INTRO_OBJECTIVE_XPATH))
+        )
+        intro_text = intro_section.text
+        with open(f"{week_intro_dump_path}", "w") as f:
+            f.write(intro_text)
+            # f.write(objective_text)
+        logger.info(f"Week {week_num} intro dumped")
+
+
+def supplement_dl(driver, wait, week_num):
+    logger.info("Loading supplement page")
+
+    week_dump_list_file_path = get_week_title_and_path(driver, wait, week_num)
+
+    supplement_dump_path = f"{week_dump_list_file_path}_supplement.json"
+
+    if not os.path.exists(supplement_dump_path):
+        os.makedirs(supplement_dump_path)
+
+    LECTURE_LINK_ELMS = driver.find_elements(By.XPATH, LECTURE_LINK_XPATH)
+
+    logger.info(f"Len of LECTURE_LINKS elements: {len(LECTURE_LINK_ELMS)}")
+    SUPPLEMENT_LINKS = [
+        {
+            "text": link.find_element(By.XPATH, LECTURE_NAME_XPATH).text,
+            "href": link.get_attribute("href"),
+        }
+        for link in LECTURE_LINK_ELMS
+        if "/supplement/" in link.get_attribute("href")
+    ]
+    logger.info(f"Len of LECTURE_LINKS href: {len(SUPPLEMENT_LINKS)}")
 
 
 def course_dl(driver, wait, week_num):
@@ -141,17 +185,16 @@ def course_dl(driver, wait, week_num):
 
     week_dump_list_file_path = get_week_title_and_path(driver, wait, week_num)
 
-    # return from function if week_dump_list_file_path exists
+    dump_week_intro(driver, wait, week_dump_list_file_path, week_num)
+
     if os.path.exists(f"{week_dump_list_file_path}.json"):
         logger.info(f"Week {week_num} already dumped")
         return
 
-    # find elements with LECTURE_LINK_XPATH and get its href in list
     LECTURE_LINK_ELMS = driver.find_elements(By.XPATH, LECTURE_LINK_XPATH)
 
     logger.info(f"Len of LECTURE_LINKS elements: {len(LECTURE_LINK_ELMS)}")
 
-    # get links href
     LECTURE_LINKS = [
         {
             "text": link.find_element(By.XPATH, LECTURE_NAME_XPATH).text,
@@ -235,10 +278,13 @@ def download_lectures(driver, wait, week_num):
             )
             if not os.path.exists("exports"):
                 os.makedirs("exports")
-            if not os.path.exists("exports/lectures"):
-                os.makedirs("exports/lectures")
+            if not os.path.exists(f"exports/courses/{COURSE_TITLE}"):
+                os.makedirs(f"exports/courses/{COURSE_TITLE}")
             if not os.path.exists(week_dump_list_file_path):
                 os.makedirs(week_dump_list_file_path)
+            lecture_dump_path = f"{week_dump_list_file_path}/Lectures"
+            if not os.path.exists(lecture_dump_path):
+                os.makedirs(lecture_dump_path)
             file_name = link["text"]
             file_name = file_name.replace("/", "-")
             file_name = file_name.replace(":", " -")
@@ -247,9 +293,9 @@ def download_lectures(driver, wait, week_num):
             )
             if file_extension == "mp4":
                 file_index += 1
-            # open link using request and save to exports/lectures folder
+            # open link using request and save to exports lectures folder
             with open(
-                f"{week_dump_list_file_path}/{file_index}. {file_name}.{file_extension}",
+                f"{lecture_dump_path}/{file_index}. {file_name}.{file_extension}",
                 "xb",
             ) as f:
                 f.write(requests.get(link["href"]).content)
@@ -274,7 +320,7 @@ def set_autoplay_off(driver, wait):
     logger.info("Local storage set")
 
 
-def downloadQuiz(driver, wait, endpoint):
+def download_quiz(driver, wait, endpoint):
     quiz_file_path = "exports/quiz.md"
     if os.path.exists(quiz_file_path):
         logger.info(f"Quiz already downloaded")
@@ -376,10 +422,11 @@ def main():
             + (": " + traceback.format_exc() if LOG_LEVEL == logging.DEBUG else "")
         )
     try:
-        # downloadQuiz(_driver, _wait, QUIZ_ENDPOINT) # for quiz
-        downloadQuiz(_driver, _wait, EXAM_ENDPOINT) # for exam
-        _driver.quit()
-        return
+        if QUIZ_MODE:
+            # download_quiz(_driver, _wait, QUIZ_ENDPOINT) # for quiz
+            download_quiz(_driver, _wait, EXAM_ENDPOINT)  # for exam
+            _driver.quit()
+            return
     except Exception:
         logger.error(
             "Error downloading quiz"
@@ -388,23 +435,32 @@ def main():
         _driver.quit()
         return
     try:
-        WEEK_COUNT = get_week_count(_driver, _wait)
-        set_autoplay_off(_driver, _wait)
-        logger.info("Week count: " + str(WEEK_COUNT))
-        for i in range(WEEK_COUNT):
-            logger.info(f"Week {i + 1}")
-            try:
-                course_dl(_driver, _wait, i + 1)
-                download_lectures(_driver, _wait, i + 1)
-            except Exception:
-                logger.error(
-                    "Error downloading course"
-                    + (
-                        ": " + traceback.format_exc()
-                        if LOG_LEVEL == logging.DEBUG
-                        else ""
+        if LECTURE_MODE:
+            WEEK_COUNT = get_week_count(_driver, _wait)
+            set_autoplay_off(_driver, _wait)
+            for i in range(WEEK_COUNT):
+                if i == 1 and TESTING_MODE:
+                    _driver.quit()
+                    return
+                logger.info(f"Week {i + 1}")
+                try:
+                    supplement_dl(_driver, _wait, i + 1)
+                    course_dl(_driver, _wait, i + 1)
+                    download_lectures(_driver, _wait, i + 1)
+                except Exception:
+                    logger.error(
+                        "Error downloading course"
+                        + (
+                            ": " + traceback.format_exc()
+                            if TESTING_MODE or LOG_LEVEL == logging.DEBUG
+                            else ""
+                        )
                     )
-                )
+                    _driver.quit()
+                    return
+        else:
+            _driver.quit()
+            return
     except Exception:
         logger.error(
             "Error getting week"
