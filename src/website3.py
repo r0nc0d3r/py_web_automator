@@ -150,7 +150,7 @@ def dump_week_intro(driver, wait, week_dump_list_file_path, week_num):
             EC.visibility_of_element_located((By.XPATH, WEEK_INTRO_OBJECTIVE_XPATH))
         )
         intro_text = intro_section.text
-        with open(f"{week_intro_dump_path}", "w") as f:
+        with open(f"{week_intro_dump_path}", "x") as f:
             f.write(intro_text)
             # f.write(objective_text)
         logger.info(f"Week {week_num} intro dumped")
@@ -163,21 +163,88 @@ def supplement_dl(driver, wait, week_num):
 
     supplement_dump_path = f"{week_dump_list_file_path}_supplement.json"
 
-    if not os.path.exists(supplement_dump_path):
-        os.makedirs(supplement_dump_path)
+    if os.path.exists(f"{supplement_dump_path}"):
+        logger.info(f"Week Supplement {week_num} already dumped")
+        return
 
-    LECTURE_LINK_ELMS = driver.find_elements(By.XPATH, LECTURE_LINK_XPATH)
+    SUPPLEMENT_LINK_ELMS = driver.find_elements(By.XPATH, LECTURE_LINK_XPATH)
 
-    logger.info(f"Len of LECTURE_LINKS elements: {len(LECTURE_LINK_ELMS)}")
+    logger.info(f"Len of SUPPLEMENT_LINKS elements: {len(SUPPLEMENT_LINK_ELMS)}")
     SUPPLEMENT_LINKS = [
         {
             "text": link.find_element(By.XPATH, LECTURE_NAME_XPATH).text,
             "href": link.get_attribute("href"),
         }
-        for link in LECTURE_LINK_ELMS
+        for link in SUPPLEMENT_LINK_ELMS
         if "/supplement/" in link.get_attribute("href")
     ]
-    logger.info(f"Len of LECTURE_LINKS href: {len(SUPPLEMENT_LINKS)}")
+    logger.info(f"Len of SUPPLEMENT_LINKS href: {len(SUPPLEMENT_LINKS)}")
+    with open(f"{supplement_dump_path}", "w") as f:
+        json.dump(SUPPLEMENT_LINKS, f)
+
+
+def download_supplements(driver, wait, week_num):
+    logger.info("Downloading supplements...")
+    week_dump_list_file_path = get_week_title_and_path(driver, wait, week_num)
+    supplement_dir_path = f"{week_dump_list_file_path}/Supplements"
+    # if path exists
+    if os.path.exists(supplement_dir_path):
+        files_in_directory = os.listdir(supplement_dir_path)
+        if len(files_in_directory) > 1:
+            logger.info(f"Supplement for {week_dump_list_file_path} already downloaded")
+            return
+    supplement_dumped_file = f"{week_dump_list_file_path}_supplement.json"
+    with open(supplement_dumped_file, "r") as file:
+        sp_dl_links = json.load(file)
+    file_index = 0
+    for link in sp_dl_links:
+        try:
+            file_index += 1
+
+            supplement_content = ""
+            logger.info(
+                f"Opening supplement link{f': {link}' if LOG_LEVEL == logging.DEBUG else ''}"
+            )
+            driver.get(link["href"])
+            time.sleep(0.2)
+            wait.until(
+                EC.visibility_of_element_located((By.XPATH, SUPPLEMENT_CONTENT_XPATH))
+            )
+            wait.until(
+                EC.visibility_of_element_located((By.XPATH, SUPPLEMENT_TITLE_XPATH))
+            )
+            if not os.path.exists(supplement_dir_path):
+                os.makedirs(supplement_dir_path)
+            file_name = link["text"]
+            if file_name.strip() == "":
+                supplement_title_elm = driver.find_element(
+                    By.XPATH, SUPPLEMENT_TITLE_XPATH
+                )
+                file_name = supplement_title_elm.text
+            file_name = file_name.replace("/", "-")
+            file_name = file_name.replace(":", " -")
+            supplement_dump_path = f"{supplement_dir_path}/{file_index}. {file_name}.md"
+            supplement_content_elm = driver.find_element(
+                By.XPATH, SUPPLEMENT_CONTENT_XPATH
+            )
+
+            supplement_content = supplement_content_elm.text
+            with open(
+                supplement_dump_path,
+                "x",
+            ) as f:
+                f.write(supplement_content)
+            logger.info(f"Saved supplement page")
+        except Exception:
+            logger.error(
+                "Error opening supplement"
+                + (
+                    ": " + traceback.format_exc()
+                    if TESTING_MODE or LOG_LEVEL == logging.DEBUG
+                    else ""
+                )
+            )
+            continue
 
 
 def course_dl(driver, wait, week_num):
@@ -215,7 +282,7 @@ def course_dl(driver, wait, week_num):
                 f"Opening lecture for downloading{f': {link}' if LOG_LEVEL == logging.DEBUG else ''}"
             )
             driver.get(link["href"])
-            time.sleep(1)
+            time.sleep(0.2)
             wait.until(
                 EC.visibility_of_element_located((By.XPATH, LECTURE_DL_BTN_XPATH))
             )
@@ -266,7 +333,7 @@ def download_lectures(driver, wait, week_num):
     week_dump_list_file_path = get_week_title_and_path(driver, wait, week_num)
     # if path exists
     if os.path.exists(week_dump_list_file_path):
-        logger.info(f"Module {week_dump_list_file_path} already downloaded")
+        logger.info(f"Lectures for {week_dump_list_file_path} already downloaded")
         return
     with open(f"{week_dump_list_file_path}.json", "r") as file:
         dl_links = json.load(file)
@@ -447,6 +514,7 @@ def main():
                     supplement_dl(_driver, _wait, i + 1)
                     course_dl(_driver, _wait, i + 1)
                     download_lectures(_driver, _wait, i + 1)
+                    download_supplements(_driver, _wait, i + 1)
                 except Exception:
                     logger.error(
                         "Error downloading course"
